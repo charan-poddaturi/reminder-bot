@@ -129,10 +129,10 @@ def main():
         reminder_dt = scheduled_dt - timedelta(minutes=5)
 
         # Difference between now and reminder
-        diff = abs((now - reminder_dt).total_seconds())
+        diff = (now - reminder_dt).total_seconds()
 
         # Allow 2-minute tolerance
-        if diff <= 120:
+        if 0 <= diff <= 240:
 
             msg = (
                 f"🔔 Upcoming Task Reminder\n\n"
