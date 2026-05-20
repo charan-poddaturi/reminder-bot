@@ -2,16 +2,19 @@ name: Reminder Bot
 
 on:
   schedule:
-    - cron: '0/5 * * * *'   # every 5 minutes, 24/7
-  workflow_dispatch:          # manual trigger for testing
+    - cron: '*/5 * * * *'
+
+  workflow_dispatch:
 
 jobs:
   remind:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Set up Python
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -19,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: pip install requests pytz
 
-      - name: Run reminder check
+      - name: Run Reminder Bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
