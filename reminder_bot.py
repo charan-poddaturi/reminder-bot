@@ -68,21 +68,31 @@ SCHEDULE = {
 
 def send(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": CHAT_ID, "text": text}, timeout=10)
+
+    try:
+        response = requests.post(
+            url,
+            json={
+                "chat_id": CHAT_ID,
+                "text": text
+            },
+            timeout=10
+        )
+
+        print("STATUS:", response.status_code)
+        print("RESPONSE:", response.text)
+
+        response.raise_for_status()
+
+    except Exception as e:
+        print("ERROR:", e)
 
 def main():
     now = datetime.now(IST)
-    day = now.strftime("%A")
-    # Check current time AND 4 minutes around it (cron fires every 5 min, may drift)
-    for delta in range(5):
-        t = now - timedelta(minutes=delta)
-        hhmm = t.strftime("%H:%M")
-        task = SCHEDULE.get(day, {}).get(hhmm)
-        if task:
-            send(f"🔔 {day} {hhmm} IST\n\n{task}")
-            print(f"Sent: {hhmm} → {task}")
-            return
-    print(f"No task at {now.strftime('%H:%M')} IST")
+
+    print("Current IST:", now)
+
+    send("✅ TEST MESSAGE FROM GITHUB ACTIONS")
 
 if __name__ == "__main__":
     main()
