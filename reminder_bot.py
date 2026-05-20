@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Charan's Reminder Bot - GitHub Actions version
-Runs every 5 min via GitHub Actions cron. Sends message if task matches.
+Charan's Reminder Bot
+Runs every 5 min via GitHub Actions cron.
+Sends reminder 5 minutes BEFORE scheduled task.
 """
 
 import os
@@ -10,8 +11,13 @@ from datetime import datetime, timedelta
 import pytz
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-CHAT_ID   = os.environ["CHAT_ID"]
-IST       = pytz.timezone("Asia/Kolkata")
+CHAT_ID = os.environ["CHAT_ID"]
+
+IST = pytz.timezone("Asia/Kolkata")
+
+# =========================
+# SCHEDULES
+# =========================
 
 WEEKDAY = {
     "04:30": "⏰ Wakeup!",
@@ -61,10 +67,18 @@ SUNDAY = {
 }
 
 SCHEDULE = {
-    "Monday": WEEKDAY, "Tuesday": WEEKDAY,
-    "Wednesday": WEEKDAY, "Thursday": WEEKDAY, "Friday": WEEKDAY,
-    "Saturday": SATURDAY, "Sunday": SUNDAY,
+    "Monday": WEEKDAY,
+    "Tuesday": WEEKDAY,
+    "Wednesday": WEEKDAY,
+    "Thursday": WEEKDAY,
+    "Friday": WEEKDAY,
+    "Saturday": SATURDAY,
+    "Sunday": SUNDAY,
 }
+
+# =========================
+# SEND TELEGRAM MESSAGE
+# =========================
 
 def send(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -87,14 +101,53 @@ def send(text):
     except Exception as e:
         print("ERROR:", e)
 
+# =========================
+# MAIN LOGIC
+# =========================
+
 def main():
     now = datetime.now(IST)
 
     print("Current IST:", now)
 
-    send("✅ TEST MESSAGE FROM GITHUB ACTIONS")
-    print("BOT TOKEN LENGTH:", len(BOT_TOKEN))
-    print("CHAT ID:", CHAT_ID)
+    day = now.strftime("%A")
+
+    today_schedule = SCHEDULE.get(day, {})
+
+    for task_time, task_name in today_schedule.items():
+
+        # Convert schedule time to datetime
+        scheduled_dt = datetime.strptime(task_time, "%H:%M")
+        scheduled_dt = now.replace(
+            hour=scheduled_dt.hour,
+            minute=scheduled_dt.minute,
+            second=0,
+            microsecond=0
+        )
+
+        # Reminder 5 mins before
+        reminder_dt = scheduled_dt - timedelta(minutes=5)
+
+        # Difference between now and reminder
+        diff = abs((now - reminder_dt).total_seconds())
+
+        # Allow 2-minute tolerance
+        if diff <= 120:
+
+            msg = (
+                f"🔔 Upcoming Task Reminder\n\n"
+                f"📅 {day}\n"
+                f"⏰ Starts at: {task_time} IST\n\n"
+                f"{task_name}"
+            )
+
+            print("Sending reminder:", task_name)
+
+            send(msg)
+
+            return
+
+    print("No reminder to send now")
 
 
 if __name__ == "__main__":
