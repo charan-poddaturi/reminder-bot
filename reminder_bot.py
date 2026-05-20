@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 """
-Charan's Schedule Reminder Bot
-Deploy on Railway. Set env vars: BOT_TOKEN, CHAT_ID
+Charan's Reminder Bot - GitHub Actions version
+Runs every 5 min via GitHub Actions cron. Sends message if task matches.
 """
 
 import os
-import time
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
-# ─── CONFIG ───────────────────────────────────────────────────────────────────
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8722143494:AAGe4ODGUQB_nQavOTIuv1w5lGizg5zxE5Y")
-CHAT_ID   = os.environ.get("CHAT_ID", "7465929735")   
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+CHAT_ID   = os.environ["CHAT_ID"]
 IST       = pytz.timezone("Asia/Kolkata")
-
-# ─── WEEKLY SCHEDULE (24hr IST) ───────────────────────────────────────────────
 
 WEEKDAY = {
     "04:30": "⏰ Wakeup!",
@@ -65,49 +61,28 @@ SUNDAY = {
 }
 
 SCHEDULE = {
-    "Monday":    WEEKDAY,
-    "Tuesday":   WEEKDAY,
-    "Wednesday": WEEKDAY,
-    "Thursday":  WEEKDAY,
-    "Friday":    WEEKDAY,
-    "Saturday":  SATURDAY,
-    "Sunday":    SUNDAY,
+    "Monday": WEEKDAY, "Tuesday": WEEKDAY,
+    "Wednesday": WEEKDAY, "Thursday": WEEKDAY, "Friday": WEEKDAY,
+    "Saturday": SATURDAY, "Sunday": SUNDAY,
 }
 
-# ─── TELEGRAM ─────────────────────────────────────────────────────────────────
-
-def send_message(text):
+def send(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    try:
-        r = requests.post(url, json={"chat_id": CHAT_ID, "text": text}, timeout=10)
-        r.raise_for_status()
-        print(f"[SENT] {text}")
-    except Exception as e:
-        print(f"[ERROR] {e}")
+    requests.post(url, json={"chat_id": CHAT_ID, "text": text}, timeout=10)
 
-# ─── MAIN LOOP ────────────────────────────────────────────────────────────────
-
-def run():
-    if not CHAT_ID:
-        print("[ERROR] CHAT_ID env variable not set! Check Railway variables.")
-        return
-
-    print(f"[BOT] Started. CHAT_ID={CHAT_ID}. Checking every 30s.")
-    send_message("🤖 Reminder bot is online! You'll get reminders on schedule.")
-
-    last_sent = None
-    while True:
-        now     = datetime.now(IST)
-        day     = now.strftime("%A")
-        hhmm    = now.strftime("%H:%M")
-        uid     = f"{day}_{hhmm}"
-
+def main():
+    now = datetime.now(IST)
+    day = now.strftime("%A")
+    # Check current time AND 4 minutes around it (cron fires every 5 min, may drift)
+    for delta in range(5):
+        t = now - timedelta(minutes=delta)
+        hhmm = t.strftime("%H:%M")
         task = SCHEDULE.get(day, {}).get(hhmm)
-        if task and uid != last_sent:
-            send_message(f"🔔 {day} {hhmm}\n\n{task}")
-            last_sent = uid
-
-        time.sleep(30)
+        if task:
+            send(f"🔔 {day} {hhmm} IST\n\n{task}")
+            print(f"Sent: {hhmm} → {task}")
+            return
+    print(f"No task at {now.strftime('%H:%M')} IST")
 
 if __name__ == "__main__":
-    run()
+    main()
