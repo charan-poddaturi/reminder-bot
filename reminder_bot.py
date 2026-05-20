@@ -93,6 +93,9 @@ def main():
     print("Current IST:", now)
 
     send("✅ TEST MESSAGE FROM GITHUB ACTIONS")
+    print("BOT TOKEN LENGTH:", len(BOT_TOKEN))
+    print("CHAT ID:", CHAT_ID)
+
 
 if __name__ == "__main__":
     main()
