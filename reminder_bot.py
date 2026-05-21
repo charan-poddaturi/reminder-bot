@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
+
 """
 Charan's Reminder Bot
-Runs every 5 min via GitHub Actions cron.
-Sends reminder 5 minutes BEFORE scheduled task.
+Reliable GitHub Actions version
 """
 
 import os
+import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
+
+# =========================
+# TELEGRAM CONFIG
+# =========================
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 
 IST = pytz.timezone("Asia/Kolkata")
+
+# =========================
+# DUPLICATE TRACKING FILE
+# =========================
+
+LAST_SENT_FILE = "last_sent.json"
 
 # =========================
 # SCHEDULES
@@ -77,13 +88,40 @@ SCHEDULE = {
 }
 
 # =========================
+# LOAD LAST SENT
+# =========================
+
+def load_last_sent():
+
+    if not os.path.exists(LAST_SENT_FILE):
+        return {}
+
+    try:
+        with open(LAST_SENT_FILE, "r") as f:
+            return json.load(f)
+
+    except:
+        return {}
+
+# =========================
+# SAVE LAST SENT
+# =========================
+
+def save_last_sent(data):
+
+    with open(LAST_SENT_FILE, "w") as f:
+        json.dump(data, f)
+
+# =========================
 # SEND TELEGRAM MESSAGE
 # =========================
 
 def send(text):
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
     try:
+
         response = requests.post(
             url,
             json={
@@ -99,6 +137,7 @@ def send(text):
         response.raise_for_status()
 
     except Exception as e:
+
         print("ERROR:", e)
 
 # =========================
@@ -106,33 +145,52 @@ def send(text):
 # =========================
 
 def main():
-    now = datetime.now(IST)
 
-    print("Current IST:", now)
+    now = datetime.now(IST)
 
     day = now.strftime("%A")
 
+    print("\n==========================")
+    print("Current IST:", now)
+    print("Today:", day)
+
     today_schedule = SCHEDULE.get(day, {})
+
+    last_sent = load_last_sent()
+
+    today_date = now.strftime("%Y-%m-%d")
 
     for task_time, task_name in today_schedule.items():
 
-        # Convert schedule time to datetime
-        scheduled_dt = datetime.strptime(task_time, "%H:%M")
+        # Convert schedule time
+        task_dt = datetime.strptime(task_time, "%H:%M")
+
         scheduled_dt = now.replace(
-            hour=scheduled_dt.hour,
-            minute=scheduled_dt.minute,
+            hour=task_dt.hour,
+            minute=task_dt.minute,
             second=0,
             microsecond=0
         )
 
-        # Reminder 5 mins before
-        reminder_dt = scheduled_dt - timedelta(minutes=5)
+        # Minutes remaining
+        minutes_left = (
+            scheduled_dt - now
+        ).total_seconds() / 60
 
-        # Difference between now and reminder
-        diff = (now - reminder_dt).total_seconds()
+        print(f"\nChecking task:")
+        print(f"Task: {task_name}")
+        print(f"Starts at: {task_time}")
+        print(f"Minutes left: {minutes_left:.2f}")
 
-        # Allow 2-minute tolerance
-        if 0 <= diff <= 240:
+        # Send reminder within next 30 mins
+        if 0 <= minutes_left <= 30:
+
+            unique_key = f"{today_date}_{task_time}"
+
+            # Prevent duplicate reminders
+            if last_sent.get(unique_key):
+                print("Already sent.")
+                continue
 
             msg = (
                 f"🔔 Upcoming Task Reminder\n\n"
@@ -141,14 +199,21 @@ def main():
                 f"{task_name}"
             )
 
-            print("Sending reminder:", task_name)
+            print("Sending reminder...")
 
             send(msg)
 
+            last_sent[unique_key] = True
+
+            save_last_sent(last_sent)
+
+            print("Reminder sent successfully.")
+
             return
 
-    print("No reminder to send now")
+    print("\nNo reminder to send now.")
 
+# =========================
 
 if __name__ == "__main__":
     main()
